@@ -2,16 +2,12 @@
 
 ## Installation
 
-Clone the repository:
-
 ```sh
+# Clone the repository
 git clone ssh://git@git.blackrock.com:9102/~bmckelve/zshquery.git ~/zsh/
-```
 
-In your .zshrc, add the following line:
-
-```sh
-export PATH="$HOME/zsh/examples:$HOME/zsh/scripts:$PATH"
+# Add it to your PATH:
+echo 'export PATH="$HOME/zsh/examples:$HOME/zsh/scripts:$PATH"' >> ~/.zshrc
 ```
 
 ## Example script
