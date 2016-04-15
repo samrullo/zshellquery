@@ -1,5 +1,8 @@
 # zshquery
 
+zshquery is a small set of utilities designed to make creating short scripts
+easier, and much easier than typing the same thing over and over in ADS.
+
 ## Installation
 
 ```sh
