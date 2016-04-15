@@ -1,0 +1,74 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description "Get recent prices for a security and a given hierarchy"
+
+argument cusip 'BRS cusip'
+
+option from f 'from date' $ONE_MONTH_AGO
+option to t 'to date' $TODAY
+option date a 'single date' 0
+option px_hi M 'price hierarchy' NAV
+
+parse $0 $@
+
+if [[ "$date" != 0 ]]; then
+  from="$date"
+  to="$date"
+fi
+
+sql <<SQL
+select
+    s.mark_date_time as date,
+    s.purpose,
+    s.source,
+    s.price
+into #prices
+from pricedb.dbo.spdb s
+inner join pricedb.dbo.price_hierarchy ph
+    on s.purpose = ph.purpose
+where
+    s.cusip = "$cusip"
+    and s.mark_date_time between "$from" and "$to"
+    and ph.price_group = "$px_hi"
+group by
+    s.mark_date_time,
+    ph.price_group,
+    s.cusip
+having
+    ph.group_order = min(ph.group_order)
+    and s.purpose = ph.purpose
+union all
+select
+    ep.as_of as date,
+    ep.purpose,
+    ep.source,
+    ep.px_close as price
+from equitydb.dbo.eq_prices ep
+inner join pricedb.dbo.price_hierarchy ph
+    on ep.purpose = ph.purpose
+where
+    ep.cusip = "$cusip"
+    and ep.as_of between "$from" and "$to"
+    and ph.price_group = "$px_hi"
+group by
+    ep.as_of,
+    ph.price_group,
+    ep.cusip
+having
+    ph.group_order = min(ph.group_order)
+    and ep.purpose = ph.purpose
+
+select
+    $(format_date date),
+    purpose,
+    source,
+    price
+from #prices
+order by
+    date,
+    purpose
+
+drop table #prices
+go
+SQL

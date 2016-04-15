@@ -1,0 +1,29 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description "Retrieve decodes"
+
+argument description 'table description'
+
+option code c 'code' null
+toggle local l 'search local decodes only'
+toggle global g 'search global decodes only'
+
+parse $0 $@
+
+table=misdb.dbo.decodes
+if [ $local -ne 0 ]; then
+  table=misdb.dbo.decodes_local
+elif [ $global -ne 0 ]; then
+  table=globaldb.dbo.decodes_global
+fi
+
+opt=
+[ "$code" != null ] && opt+="    and cde = \"$code\"\n"
+
+sql <<SQL
+select *
+from $table
+where tbl_desc = "$description"
+${opt}go
+SQL

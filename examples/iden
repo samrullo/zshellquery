@@ -1,0 +1,53 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description 'Find other identifiers associated with a security identifier'
+
+argument id 'security identifier'
+
+parse $0 $@
+
+sql <<SQL
+declare @cusip char(9)
+
+if exists (select 1 from secdb.dbo.sec_master where cusip = "$id")
+    set @cusip = "$id"
+else
+    select @cusip = bfm_cusip
+    from secdb.dbo.cusip_map
+    where alias_identifier = "$id"
+
+create table #ids (
+    id varchar(60),
+    alias varchar(255)
+)
+
+if @cusip is not null
+    insert into #ids (id, alias)
+    values (@cusip, "BFM CUSIP")
+
+insert into #ids (id, alias)
+select cm.alias_identifier as id, ba.decde as alias
+from secdb.dbo.cusip_map cm
+inner join misdb.dbo.decodes ba
+    on cm.alias_code = ba.cde
+where ba.tbl_desc = "B_ALIAS"
+    and cm.bfm_cusip = @cusip
+
+insert into #ids (id, alias)
+select sm.cusip as id, "ticker (" + sm.market + ")" as alias
+from secdb.dbo.sec_master sm
+inner join secdb.dbo.cusip_map cm
+    on sm.cusip = cm.bfm_cusip
+where sm.ticker = "$id"
+    and sm.sec_type = "EQUITY"
+    and sm.sec_group = "EQUITY"
+    and cm.alias_code = "C"
+
+select
+    $(format_string 15 id),
+    $(format_string 20 alias)
+from #ids
+
+go
+SQL

@@ -1,0 +1,41 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description 'Look up an iShare by its street ticker'
+
+argument ticker 'street ticker'
+
+argument country 'country of market'
+
+
+# [[ $# -eq 1 ]] && echo hi
+
+country=US
+parse $0 $@
+
+sql --no_commas <<SQL
+select cm.bfm_cusip as sec_cusip, ps.portfolio_name, ps.cusip as port_cusip,
+    ps.portfolio_code, ps.full_name, ca.alias_cusip as isin
+from brs_globaldb.dbo.global_id_map bt
+inner join brs_globaldb.dbo.global_id_map s
+    on bt.aladdin_id = s.aladdin_id
+    and bt.end_date = s.end_date
+inner join secdb.dbo.cusip_map cm
+    on s.public_id = cm.alias_identifier
+inner join portdb.dbo.mf_portfolios_new mpn
+    on cm.bfm_cusip = mpn.cusip
+inner join portdb.dbo.port_rel pr
+    on mpn.fund = pr.child_code
+inner join portdb.dbo.portfolios ps
+    on pr.parent_code = ps.portfolio_code
+inner join secdb.dbo.cusip_aliases ca
+    on cm.bfm_cusip = ca.bfm_cusip
+where bt.public_id_type = "BT"
+    and bt.end_date = "12/31/2222"
+    and bt.public_id like "$ticker $country"
+    and s.public_id_type = "S"
+    and cm.alias_code = "C"
+    and pr.rel_type = "SHARE_CLASS"
+    and ca.purpose = "ISIN"
+go
+SQL

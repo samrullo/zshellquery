@@ -1,0 +1,46 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+if client_is BLK; then
+  restrict=BLKALL_ISS
+else
+  restrict=ALL_FUNDS
+fi
+
+description "Retrieve a fund's NAV"
+
+argument fund 'portfolio name'
+
+option date a 'NAV date' $YESTERDAY
+
+option restrict r 'restrict to port group' $restrict
+
+option ignore i 'ignore port groups' TEST_FUNDS
+
+parse $0 $@
+
+ignore=${ignore:gs/,/\", \"/}
+
+sql <<SQL
+select round(sum(ph.value / ecb.fxspot), 0) as aum
+from portdb.dbo.port_group_expand pge
+inner join portdb.dbo.port_group_expand rep
+    on pge.portfolio_code = rep.portfolio_code
+left join portdb.dbo.port_group_expand ignore
+    on pge.portfolio_code = ignore.portfolio_code
+    and ignore.anc_port_group = "${ignore:u}"
+inner join portdb.dbo.portfolios ps
+    on pge.portfolio_code = ps.portfolio_code
+inner join portdb.dbo.port_hist ph
+    on ps.portfolio_code = ph.portfolio_code
+inner join economydb.dbo.econ_cswap_basis ecb
+    on ps.currency = ecb.currency2
+    and ph.port_date = ecb.date
+where pge.anc_port_group = "${fund:u}"
+    and rep.anc_port_group = "${restrict:u}"
+    and ignore.portfolio_name is null
+    and ph.port_date = "$date"
+    and ph.datatype = "GP_NAV"
+    and ecb.purpose = "P100"
+go
+SQL

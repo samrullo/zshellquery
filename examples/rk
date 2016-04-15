@@ -1,0 +1,46 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description "Get recent risk for a security and a given hierarchy"
+
+argument cusip 'BRS cusip'
+
+option from f 'from date' $ONE_MONTH_AGO
+option to t 'to date' $TODAY
+option hier D 'risk hierarchy' RISK
+
+parse $0 $@
+
+sql <<SQL
+select
+    $(format_date rc.risk_date),
+    $(format_number 10 4 rc.oad),
+    $(format_number 10 4 rc.oac),
+    $(format_number 10 4 rc.oas),
+    $(format_number 10 4 rc.yield_to_worst),
+    $(format_number 10 4 rc.mod_dur_to_worst),
+    $(format_number 10 4 rc.ror_cbe),
+    $(format_number 14 4 rc.price),
+    $(format_number 10 4 rc.accr_int),
+    rc.currency,
+    rc.source,
+    rc.purpose,
+    rc.pm
+from riskdb.dbo.risk_core rc
+inner join pricedb.dbo.price_hierarchy ph
+    on rc.purpose = ph.purpose
+where
+    rc.cusip = "$cusip"
+    and rc.risk_date between "$from" and "$to"
+    and ph.price_group = "$hier"
+group by
+    rc.risk_date,
+    ph.price_group,
+    rc.cusip
+having
+    ph.group_order = min(ph.group_order)
+    and rc.purpose = ph.purpose
+order by
+    rc.risk_date
+go
+SQL

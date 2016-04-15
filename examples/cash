@@ -1,0 +1,51 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description "Retrieve a fund's cash position"
+
+argument fund 'portfolio name'
+
+option date a 'position date' $TODAY
+
+toggle legacy_cash l 'use legacy cash calculation'
+toggle eq_sod e 'turn on start of day cash' Y N
+
+parse $0 $@
+
+[ $legacy_cash -eq 0 ] && alpha_cash=1 || alpha_cash=0
+
+sql <<SQL
+create table #est_cash (
+  est_cash_type char(1),
+  portfolio_code int not null,
+  portfolio_name char(10),
+  parent char(10) null,
+  parent_path varchar(255) null,
+  asof datetime not null,
+  currency char(3) not null,
+  est_committed_cash float null
+)
+
+exec workdb.dbo.load_est_cash_new @port_group="$fund", @asof="$date", @scale_factor=1, @use_alpha_cash=$alpha_cash, @eq_sod="$eq_sod"
+
+select
+  case est_cash_type
+    when "A" then "Alpha"
+    when "D" then "net dividends"
+    when "N" then "new cash"
+    when "R" then "FX activity"
+    when "S" then "settling today"
+    when "T" then "trade activity"
+    when "V" then "varmar/netmar"
+    when "X" then "FX activity"
+    else est_cash_type
+  end as cash_type,
+  currency,
+  $(format_number 14 2 est_committed_cash)
+from #est_cash
+where est_committed_cash <> 0
+order by currency
+
+drop table #est_cash
+go
+SQL

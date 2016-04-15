@@ -1,0 +1,63 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description 'Dump the list of cusips in a portfolio group'
+
+argument group 'portfolio group'
+
+option date a 'position date' $TODAY
+
+parse $0 $@
+
+sql --list <<SQL
+select
+  ps.portfolio_code,
+  ps.pos_table
+into #funds
+from portdb.dbo.port_group_expand pge
+inner join portdb.dbo.portfolios ps
+  on pge.portfolio_code = ps.portfolio_code
+where
+  pge.anc_port_group = "${group:u}"
+
+select
+  p.cusip
+from #funds f
+inner join posdb.dbo.position_apv p
+  on f.portfolio_code = p.fund
+where
+  f.pos_table = "pos"
+  and p.start_date <= "$date"
+  and p.stop_date >= "$date"
+group by
+  p.cusip
+
+union
+
+select
+  bp.cusip
+from #funds f
+inner join analdb.dbo.brs_pos_apv bp
+  on f.portfolio_code = bp.fund
+where
+  f.pos_table = "brs_pos"
+  and bp.pos_date = "$date"
+group
+  by bp.cusip
+
+union
+
+select
+  ip.cusip
+from #funds f
+inner join analdb.dbo.index_pos ip
+  on f.portfolio_code = ip.fund
+where
+  f.pos_table = "index_pos"
+  and ip.pos_date = "$date"
+group
+  by ip.cusip
+
+drop table #funds
+go
+SQL

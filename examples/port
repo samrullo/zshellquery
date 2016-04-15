@@ -1,0 +1,54 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description "Duplicate a fund's quick_port output"
+
+argument fund 'portfolio name'
+
+toggle expand e 'expand portfolio group'
+
+parse $0 $@
+
+local from
+local where
+if [ $expand -eq 0 ]; then
+  define from <<END
+from portdb.dbo.portfolios ps
+END
+  define where <<END
+ps.portfolio_name = "${fund:u}"
+END
+else
+  define from <<END
+from portdb.dbo.port_group_expand pge
+inner join portdb.dbo.portfolios ps
+  on pge.portfolio_code = ps.portfolio_code
+END
+  define where <<END
+pge.anc_port_group = "${fund:u}"
+END
+fi
+
+sql --no_commas <<SQL
+select
+  ps.portfolio_name,
+  $(format_string 30 ps.full_name),
+  $(format_string 14 ps.portfolio_type),
+  $(format_string 9 ps.pos_table),
+  ps.nav_subtotal,
+  ps.currency,
+  $(format_string 10 sm.ticker benchmark),
+  case pg.portfolio_group when null then 'G' else 'F' end as "group",
+  ps.portfolio_code,
+  ps.cusip
+$from
+left join secdb.dbo.sec_master sm
+  on ps.liab_cusip = sm.cusip
+left join portdb.dbo.port_group pg
+  on ps.portfolio_name = pg.portfolio_group
+  and ps.portfolio_name = pg.portfolio_name
+  and ps.portfolio_code = pg.portfolio_code
+where
+  $where
+go
+SQL

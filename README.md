@@ -2,8 +2,16 @@
 
 ## Installation
 
+Clone the repository:
+
 ```sh
 git clone ssh://git@git.blackrock.com:9102/~bmckelve/zshquery.git ~/zsh/
+```
+
+In your .zshrc, add the following line:
+
+```sh
+export PATH="$HOME/zsh/examples:$HOME/zsh/scripts:$PATH"
 ```
 
 ## Example script
@@ -11,8 +19,8 @@ git clone ssh://git@git.blackrock.com:9102/~bmckelve/zshquery.git ~/zsh/
 ```zsh
 #!/usr/bin/env zsh
 
-# Assuming your file is in ~/zsh
-source ${0:a:h}/lib/query.zsh
+# Assuming your file is in ~/zsh/scripts
+source ${0:a:h}/../lib/query.zsh
 
 # Describe your utility, its arguments and options
 description "Get recent returns for a security and a given hierarchy"

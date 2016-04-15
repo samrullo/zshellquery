@@ -1,0 +1,104 @@
+#!/usr/bin/env zsh
+source ${0:a:h}/../lib/query.zsh
+
+description "Retrieve basic security information"
+
+argument cusip 'BRS cusip'
+
+option date a 'analysis date' $YESTERDAY
+
+toggle extra x 'show extra metrics like price and risk'
+
+parse $0 $@
+
+sql_if_exists() {
+  results=$(while read line; do print $line; done | sql)
+  print -- $results | if read -r && read -r && read -r; then
+    print -- $@
+    print -- $results
+    print
+  fi
+}
+
+sql_if_exists $(yellow Security) <<SQL
+select
+    cusip,
+    sec_type,
+    sec_group,
+    sec_desc1,
+    sec_desc2,
+    $(format_number 9 4 coupon),
+    $(format_date maturity),
+    $(format_date issue_date),
+    $(format_string 10 ticker),
+    country,
+    market,
+    currency
+from secdb.dbo.sec_master
+where
+    cusip = "$cusip"
+go
+SQL
+
+sql_if_exists $(yellow Issuer) <<SQL
+select
+    im.issuer,
+    $(format_string 9 im.ticker),
+    $(format_string 30 im.name)
+from secdb.dbo.new_issue_info nii
+inner join globaldb.dbo.issuer_master im
+    on nii.issuer = im.issuer
+where
+    nii.cusip = "$cusip"
+go
+SQL
+
+sql_if_exists $(yellow Benchmark) <<SQL
+select
+    nii.benchmark,
+    $(format_string 9 ps.portfolio_name),
+    $(format_string 30 ps.full_name)
+from secdb.dbo.new_issue_info nii
+left join portdb.dbo.portfolios ps
+    on nii.benchmark = ps.cusip
+where
+    nii.cusip = "$cusip"
+go
+SQL
+
+sql_if_exists $(yellow Floater) <<SQL
+select
+    $(format_date start_date),
+    indx,
+    $(format_number 9 4 net_margin)
+from secdb.dbo.floater
+where cusip = "$cusip"
+go
+SQL
+
+sql_if_exists $(yellow Bond Features) <<SQL
+select
+    feature,
+    $(format_string 20 value)
+from secdb.dbo.BondFeature
+where
+    cusip = "$cusip"
+    and purpose in ("XOAS", "P100")
+    and (start_date is null or start_date <= "$date")
+    and (end_date is null or end_date >= "$date")
+go
+SQL
+
+if [ $extra -ne 0 ]; then
+  yellow Prices
+  px $cusip
+  print
+
+  yellow Risk
+  rk $cusip
+  print
+
+  yellow KRDs
+  krd $cusip
+  print
+fi
