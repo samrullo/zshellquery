@@ -3,7 +3,7 @@
 ## Installation
 
 ```sh
-git clone ssh://git@git.blackrock.com:9102/~bmckelve/zshquery.git ~/zsh/lib
+git clone ssh://git@git.blackrock.com:9102/~bmckelve/zshquery.git ~/zsh/
 ```
 
 ## Example script
